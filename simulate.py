@@ -1,54 +1,64 @@
+import csv
+import datetime
+import time
 import requests
-from datetime import datetime, timedelta  
 
-class TradingSim():
-    def __init__(self):
-        pass
-    def fetch_bitcoin_prices(self, start_date, end_date, interval):
-        """
-        Fetch Bitcoin prices between two dates at a specified interval.
+# CoinGecko API URL for Bitcoin price in USD
+COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&precision=18"
 
-        :param start_date: Start date in 'YYYY-MM-DD' format.
-        :param end_date: End date in 'YYYY-MM-DD' format.
-        :param interval: Interval ('daily', 'hourly').
-        :return: List of prices at the specified interval.
-        """
-        # Convert dates to Unix timestamps
-        start_timestamp = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp())
-        end_timestamp = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp())
+# Output CSV file
+CSV_FILE = "bitcoin_price_log.csv"
 
-        # Validate interval
-        if interval not in ["daily", "hourly"]:
-            raise ValueError("Interval must be 'daily' or 'hourly'.")
+# Function to initialize the CSV file
+def initialize_csv(file_name):
+    with open(file_name, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        # Write header
+        writer.writerow(["Timestamp", "Price (USD)"])
 
-        # Determine granularity
-        granularity = "minutely" if interval == "hourly" else "daily"
-        url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range"
-        
-        # Fetch data
-        response = requests.get(
-            url,
-            params={
-                "vs_currency": "usd",
-                "from": start_timestamp,
-                "to": end_timestamp,
-            },
-        )
+# Function to log data to the CSV file
+def log_to_csv(file_name, timestamp, price):
+    with open(file_name, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([timestamp, price])
 
-        if response.status_code != 200:
-            raise Exception(f"Error fetching data: {response.json()}")
-
+# Function to fetch Bitcoin price
+def fetch_bitcoin_price():
+    try:
+        response = requests.get(COINGECKO_API_URL)
+        response.raise_for_status()  # Raise an HTTPError for bad responses
         data = response.json()
-        prices = []
+        # Extract the price of Bitcoin in USD
+        price = data["bitcoin"]["usd"]
+        return price
+    except Exception as e:
+        print(f"Error fetching Bitcoin price: {e}")
+        return None
 
-        # Extract prices
-        for price_data in data["prices"]:
-            timestamp, price = price_data
-            dt = datetime.fromtimestamp(timestamp / 1000)  # Convert ms to s
-            if interval == "hourly":
-                if dt.minute == 0:  # Capture hourly prices only
-                    prices.append({"date": dt, "price": price})
-            else:  # Daily interval
-                prices.append({"date": dt.date(), "price": price})
+# Main function
+def main():
+    # Initialize CSV
+    initialize_csv(CSV_FILE)
+    print("Logging Bitcoin prices...")
 
-        return prices
+    try:
+        while True:
+            # Fetch Bitcoin price
+            price = fetch_bitcoin_price()
+
+            if price is not None:
+                # Get current timestamp
+                timestamp = datetime.datetime.now().isoformat()
+
+                # Log to CSV
+                log_to_csv(CSV_FILE, timestamp, price)
+
+                # Print to console
+                print(f"Logged: Timestamp={timestamp}, Price=${price}")
+            
+            # Wait for 60 seconds before fetching again
+            time.sleep(60)
+    except KeyboardInterrupt:
+        print("\nLogging stopped by user.")
+
+main()
