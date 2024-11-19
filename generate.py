@@ -1,5 +1,6 @@
 import os
 from pycoin.symbols.btc import network
+import requests
 
 # Generate a new Bitcoin private key
 key = network.keys.bip32_seed(os.urandom(64))
