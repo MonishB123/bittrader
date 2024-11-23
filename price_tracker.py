@@ -44,17 +44,16 @@ def fetch_order_book_price(symbol):
         return None, None
 
 # Write data into a CSV file
-def write_to_csv(file_name, symbol, ticker_price, avg_price, bid_price, ask_price):
+def write_to_csv(file_name, ticker_price, avg_price, bid_price, ask_price):
     try:
         with open(file_name, mode='a', newline='') as file:
             writer = csv.writer(file)
             # Add a header row if the file is empty
             if file.tell() == 0:
-                writer.writerow(["Timestamp", "Symbol", "Ticker Price", "Average Price", "Bid Price", "Ask Price"])
+                writer.writerow(["Timestamp", "Ticker Price", "Average Price", "Bid Price", "Ask Price"])
             # Write the data
             writer.writerow([
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                symbol,
                 ticker_price,
                 avg_price,
                 bid_price,
@@ -80,7 +79,7 @@ def main():
 
             # Check if data is valid before writing to the CSV
             if ticker_price and avg_price and bid_price and ask_price:
-                write_to_csv(file_name, SYMBOL, ticker_price, avg_price, bid_price, ask_price)
+                write_to_csv(file_name, ticker_price, avg_price, bid_price, ask_price)
                 print(f"Data written: Ticker: {ticker_price}, Avg: {avg_price}, Bid: {bid_price}, Ask: {ask_price}")
             else:
                 log_error("Incomplete data fetched. Skipping CSV write.")
