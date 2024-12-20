@@ -1,2 +1,4 @@
 keys/
+data/
 bitcoin_price_log.csv
+test.py
