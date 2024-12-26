@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import os
 
 numGenes = 200
-timeToPredict = 60
 xVals = []
 yVals = []
 data = cp.loadtxt(r"data\binance_prices.csv", delimiter=",", skiprows=1, usecols=1)
@@ -20,7 +19,7 @@ data = cp.loadtxt(r"data\binance_prices.csv", delimiter=",", skiprows=1, usecols
 def fitness_function(algoInstance=None, gen_sol=None, popi=None):
     def tester(solution=None):
         # Parameters for setting up price checks for model
-        i = random.randint(numGenes, len(data)-(timeToPredict+1))         # Starting index
+        i = cp.random.randint(numGenes, len(data) - 60)  # Starting index (substracted from 60 to make sure price always has a change)
         A = 300000          # Max historical price check
         N = numGenes      # Number of points
         k = -cp.log(0.5/A)/(N-1)  # minimum decay rate
@@ -29,13 +28,20 @@ def fitness_function(algoInstance=None, gen_sol=None, popi=None):
         sequence = (i - cp.round(A * cp.exp(-k * cp.arange(N))).astype(int))
         currprice = data[i]
         percentchanges = ((data[sequence] - currprice) / currprice)
+        #find the next point in data where price changes
+        new_price_i = (cp.where(data[i::] != data[i])[0])
+        # Adjust the index relative to the original array
+        if new_price_i.size > 0:
+            new_price_i = i + 1 + new_price_i[0]
+        else:
+            new_price_i = None  # No differing value found
         #prediction and accurate are multiplied by 100 to try to avoid fp errors (mabye?)
         prediction = cp.sum(percentchanges * cp.array(solution)) * 100
-        actual = ((data[i+timeToPredict] - currprice) / currprice) * 100
+        actual = ((data[new_price_i] - currprice) / currprice) * 100
         #calculate percent accuracy
         accuracy = 100 - abs((((prediction - actual) / (1 + actual)) * 100))
         return float(accuracy)
-    test_res = cp.zeros(5)
+    test_res = cp.zeros(20) #holds values to test general preformance of solution
     for i in range(len(test_res)):
         test_res[i] = tester(solution=gen_sol)
     mean_pref = float(cp.mean(test_res))
@@ -53,10 +59,10 @@ def onGen(ga_instance):
 
 # Define the parameters for the genetic algorithm
 ga_instance = pygad.GA(
-    num_generations = 100,
-    num_parents_mating=100,
+    num_generations = 500,
+    num_parents_mating=150,
     fitness_func=fitness_function,
-    sol_per_pop=500,
+    sol_per_pop=300,
     gene_type=float,
     gene_space={'low': -1.0, 'high': 1.0},
     num_genes=numGenes,
@@ -83,7 +89,6 @@ print('General preformance: ', cp.mean(sol_test))
 
 
 plt.scatter(xVals, yVals, label='Data Points')
-plt.xlim(0, 100)
 plt.ylim(-100, 100)
 plt.show()
 
