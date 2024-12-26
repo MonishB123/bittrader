@@ -2,7 +2,7 @@
 A genetic algorithm to predict the percentage changes of bitcoin. Only data used is the ticker price. Prices are indexed in exponential frequency, 
 with lower timeframes being indexed more frequently than higher ones. Fitness function takes historical data and modifies it to percent changes,
 which are then multiplied by genes (array of floats) that are optimized by PyGad. New array is summed and turned into a percent, then accuracy is 
-calculated with price 20 seconds in the future and percent accurate is returned by fitness.
+calculated with price 60 seconds in the future and percent accurate is returned as fitness.
 '''
 
 import pygad
@@ -11,32 +11,38 @@ import random
 import matplotlib.pyplot as plt
 import os
 
-numGenes = 100
+numGenes = 200
 timeToPredict = 60
 xVals = []
 yVals = []
 data = cp.loadtxt(r"data\binance_prices.csv", delimiter=",", skiprows=1, usecols=1)
 
-def fitness_function(algoInstance=None, solution=None, popi=None):
-    # Parameters for setting up price checks for model
-    i = random.randint(numGenes, len(data)-(timeToPredict+1))         # Starting index
-    A = 300000          # Max historical price check
-    N = numGenes      # Number of points
-    k = -cp.log(0.5/A)/(N-1)  # minimum decay rate
+def fitness_function(algoInstance=None, gen_sol=None, popi=None):
+    def tester(solution=None):
+        # Parameters for setting up price checks for model
+        i = random.randint(numGenes, len(data)-(timeToPredict+1))         # Starting index
+        A = 300000          # Max historical price check
+        N = numGenes      # Number of points
+        k = -cp.log(0.5/A)/(N-1)  # minimum decay rate
 
-    # Generate the sequence of price values from max historical price check -> starting index to be indexed
-    sequence = (i - cp.round(A * cp.exp(-k * cp.arange(N))).astype(int))
-    currprice = data[i]
-    percentchanges = ((data[sequence] - currprice) / currprice)
-    #prediction and accurate are multiplied by 100 to try to avoid fp errors (mabye?)
-    prediction = cp.sum(percentchanges * cp.array(solution)) * 100
-    actual = ((data[i+timeToPredict] - currprice) / currprice) * 100
-    #calculate percent accuracy
-    accuracy = 100 - abs((((prediction - actual) / actual) * 100))
-    xVals.append(popi)
-    yVals.append(float(accuracy))
-    #print(prediction, actual, accuracy)
-    return float(accuracy)
+        # Generate the sequence of price values from max historical price check -> starting index to be indexed
+        sequence = (i - cp.round(A * cp.exp(-k * cp.arange(N))).astype(int))
+        currprice = data[i]
+        percentchanges = ((data[sequence] - currprice) / currprice)
+        #prediction and accurate are multiplied by 100 to try to avoid fp errors (mabye?)
+        prediction = cp.sum(percentchanges * cp.array(solution)) * 100
+        actual = ((data[i+timeToPredict] - currprice) / currprice) * 100
+        #calculate percent accuracy
+        accuracy = 100 - abs((((prediction - actual) / (1 + actual)) * 100))
+        return float(accuracy)
+    test_res = cp.zeros(5)
+    for i in range(len(test_res)):
+        test_res[i] = tester(solution=gen_sol)
+    mean_pref = float(cp.mean(test_res))
+    if algoInstance.generations_completed % 100 == 0:
+        xVals.append(popi)
+        yVals.append(mean_pref)
+    return mean_pref
 
 #display generations completed while running GA
 def onGen(ga_instance):
@@ -47,7 +53,7 @@ def onGen(ga_instance):
 
 # Define the parameters for the genetic algorithm
 ga_instance = pygad.GA(
-    num_generations = 5000,
+    num_generations = 100,
     num_parents_mating=100,
     fitness_func=fitness_function,
     sol_per_pop=500,
@@ -72,11 +78,13 @@ print("Best Layout:", best_layout)
 print("Fitness Value:", best_fitness)
 sol_test = cp.zeros(100)
 for i in range(0, len(sol_test)):
-    sol_test[i] = fitness_function(solution=best_layout)
-print('General preformance: ', sol_test)
+    sol_test[i] = fitness_function(algoInstance=ga_instance, gen_sol=best_layout)
+print('General preformance: ', cp.mean(sol_test))
 
 
 plt.scatter(xVals, yVals, label='Data Points')
+plt.xlim(0, 100)
+plt.ylim(-100, 100)
 plt.show()
 
 
